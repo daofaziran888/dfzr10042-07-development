@@ -81,5 +81,27 @@ npm run dev
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
 
+## 维度下钻经营归属（独立领域接口）
+
+下钻模块在通用资源路由之外提供 `/api/drilldown` 领域接口，支撑按时段和父层
+查询经营归属数据（`app/services/drilldown_attribution.py`）：
+
+- `GET /api/drilldown/regions?period=` 各父层当时有效的经营区域（子地区）。
+- `GET /api/drilldown/partition-batches?period=&parent=` 打开下钻明细，返回
+  当前有效的分区明细批次；分区与原始成交行关联，批次为不可变版本快照。
+- `GET /api/drilldown/partition-batches/{id}/provinces/{省}/transactions`
+  省份页：该省合计所用的成交行（分页）。
+- `POST /api/drilldown/partition-batches/{id}/corrections` 迟到更正：在当前
+  有效批次上改派成交行归属，生成新版本批次，旧批次标记「已更正」。
+- `POST /api/drilldown/diff-reports` 差异报告：从同一批次版本逐省重算实际
+  合计与达到核查门槛的名单，并校验分区合计。
+- `POST /api/drilldown/diff-reports/{id}/confirm` 确认出数：幂等，同一报告
+  只能出数一次；批次已被更正则拒绝（不能混用更正前后的归属）。
+- `POST /api/drilldown/diff-reports/{id}/recalculate` 历史报告按锁定版本复算。
+
+验收场景见 `backend/tests/test_drilldown_attribution.py`：华东=江苏60+上海40，
+广东200属华南；迟到更正把江苏10元移给上海后总额不变，但超过55元核查门槛的
+省份名单改变，两轮分别为 [江苏] 与 []。
+
 领域：数据工程
 子方向：数据分析与数据应用
